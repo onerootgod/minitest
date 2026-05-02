@@ -1,0 +1,41 @@
+name: TCM.OS Cross-Platform Pre-Check
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  admin-responsive-test:
+    name: Admin UI Adaptation (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm install @playwright/test
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+      - name: Run Adaptation Scan
+        run: |
+          echo "Starting Multi-Device visual scan for zyadmin..."
+          # 这里后续会填充真实的测试脚本内容
+
+  mini-program-scan:
+    name: Mini Program Logic Check (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install miniprogram-ci
+        run: npm install -g miniprogram-ci
+      - name: Remote Build & Preview
+        run: |
+          echo "Connecting to WeChat DevTools via CI..."
+          # 这里后续会填充小程序自动化脚本
