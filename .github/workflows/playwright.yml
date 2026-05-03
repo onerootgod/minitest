@@ -12,20 +12,21 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: minitest
+          token: ${{ secrets.GH_PAT }}
 
       - name: Checkout zymini (Frontend)
         uses: actions/checkout@v4
         with:
           repository: onerootgod/zymini
           path: zymini
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GH_PAT }}
 
       - name: Checkout zyadmin (Backend)
         uses: actions/checkout@v4
         with:
           repository: onerootgod/zyadmin
           path: zyadmin
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GH_PAT }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -41,7 +42,7 @@ jobs:
       - name: Run Integrated UI Audit
         run: |
           cd minitest
-          # 通过环境变量告诉测试脚本源码在哪里
+          # 使用绝对路径确保测试脚本能找到源码
           ZYMINI_PATH=$GITHUB_WORKSPACE/zymini npx playwright test tests/admin-check.spec.ts
 
       - name: Report Result to War Room
@@ -50,5 +51,5 @@ jobs:
           RESULT="${{ job.status == 'success' && '✅ 通过' || '❌ 失败' }}"
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
             -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d text="⚙️ <b>【GHA 全域巡检报】</b>%0A联动仓库: zymini, zyadmin, minitest%0A巡检结论: $RESULT%0A查看详情: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            -d text="⚙️ <b>【GHA 全域巡检报】</b>%0A联动状态: 多仓库授权已激活%0A巡检结论: $RESULT%0A查看详情: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             -d parse_mode="HTML"
