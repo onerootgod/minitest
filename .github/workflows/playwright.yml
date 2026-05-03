@@ -37,13 +37,24 @@ jobs:
         with:
           node-version: 20
 
-      - name: Create Audit Folders
-        run: |
-          mkdir -p minitest/audit-results/admin
-          mkdir -p minitest/audit-results/mini
+      - name: Install miniprogram-ci
+        run: npm install -g miniprogram-ci
 
-      - name: Install & Run Admin Audit
-        id: admin_audit
+      - name: Mini-App Upload & Preview
+        run: |
+          cd zymini
+          echo "${{ secrets.WECHAT_MINIPROGRAM_KEY }}" > private.key
+          miniprogram-ci upload \
+            --appid ${{ secrets.WECHAT_MINIPROGRAM_APPID }} \
+            --key-path private.key \
+            --version 1.0.0-audit \
+            --desc "GHA Automated Audit Preview" \
+            --project-path . \
+            --qrcode-format image \
+            --qrcode-output-path ../minitest/audit-results/mini/preview_qrcode.jpg
+        continue-on-error: true
+
+      - name: Admin & Mini-Web Audit (Playwright)
         run: |
           cd minitest
           npm install
@@ -52,26 +63,27 @@ jobs:
         env:
           TEST_URL: 'https://zyadmin.pages.dev'
 
-      - name: Persist Audit Results to Repository
+      - name: Persist Audit Results
         if: always()
         run: |
           cd minitest
           git config --global user.name "Heimerdinger (Nexus Bot)"
           git config --global user.email "heimerdinger@nexus.one"
           git add audit-results/
-          git commit -m "📸 AUDIT: 自动生成多端适配审计快照 [$(date +'%Y-%m-%d %H:%M')]" || echo "No changes to commit"
+          git commit -m "📸 AUDIT: 自动生成多端适配审计快照 & 预览码 [$(date +'%Y-%m-%d %H:%M')]" || echo "No changes to commit"
           git push origin main
 
-      - name: Notify War Room (Success)
-        if: success()
+      - name: Notify War Room
+        if: always()
         run: |
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+          STATUS="${{ job.status }}"
+          if [ "$STATUS" == "success" ]; then
+            EMOJI="✅"
+          else
+            EMOJI="❌"
+          fi
+          # 构建消息
+          MSG="$EMOJI 审计流水线运行结束：$STATUS。请查收最新的 ISSUE_LOG 和截图。"
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
             -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d text="✅ 审计完成：GHA 已成功捕获全端适配快照并推送至 minitest 仓库。请 @poppy 进行视觉核对。"
-
-      - name: Notify War Room (Failure)
-        if: failure()
-        run: |
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d text="❌ 审计中断：GHA 执行失败。@heimerdinger 请检查 Playwright 运行日志和依赖环境。"
+            -d text="$MSG"
