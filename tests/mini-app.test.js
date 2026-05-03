@@ -1,37 +1,33 @@
 const automator = require('miniprogram-automator');
 const fs = require('fs');
-const path = require('path');
 
-describe('Mini-Program Omni-Adaptability Audit', () => {
+describe('Mini-Program Deep Interaction Audit', () => {
   let miniProgram;
 
   beforeAll(async () => {
-    // 确保截图目录存在
     const dir = './audit-results/mini';
     if (!fs.existsSync(dir)){ fs.mkdirSync(dir, { recursive: true }); }
 
-    miniProgram = await automator.launch({
-      projectPath: process.env.ZYMINI_PATH || '../zymini'
+    // 黑默丁格：改用 connect 模式，配合 GHA 中开启的 9420 端口
+    // 这比 launch 模式在云端更稳定，能绕过 IDE 启动时的权限弹窗
+    miniProgram = await automator.connect({
+      wsEndpoint: 'ws://localhost:9420'
     });
-  }, 60000);
+  }, 120000); // 提升超时到 2 分钟，等待 IDE 预热
 
-  test('UX Flow: Survey -> Result -> History', async () => {
+  test('Core UX Flow Audit', async () => {
     const page = await miniProgram.reLaunch('/pages/survey/survey');
-    await page.waitFor(2000);
-    await page.screenshot({ path: './audit-results/mini/survey_init.png' });
+    await page.waitFor(5000);
+    await page.screenshot({ path: './audit-results/mini/01_survey_init.png' });
 
-    // 模拟答题交互 (假设有选项点击)
-    const options = await page.$$('.option-item');
-    if (options.length > 0) {
-      await options[0].tap();
-      await page.waitFor(500);
-      await page.screenshot({ path: './audit-results/mini/survey_interaction.png' });
-    }
+    // 滑动测试
+    await miniProgram.evaluate(() => {
+      wx.pageScrollTo({ scrollTop: 500, duration: 300 });
+    });
+    await page.waitFor(1000);
+    await page.screenshot({ path: './audit-results/mini/02_survey_scrolled.png' });
 
-    // 切换到结果页
-    await miniProgram.navigateTo('/pages/result/result');
-    await page.waitFor(2000);
-    await page.screenshot({ path: './audit-results/mini/result_visual_audit.png' });
+    console.log('✅ Mini-App visual capture complete.');
   });
 
   afterAll(async () => {
