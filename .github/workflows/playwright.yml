@@ -1,0 +1,54 @@
+name: TCM.OS Multi-Repo Integrated Audit
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  integrated-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout minitest (Self)
+        uses: actions/checkout@v4
+        with:
+          path: minitest
+
+      - name: Checkout zymini (Frontend)
+        uses: actions/checkout@v4
+        with:
+          repository: onerootgod/zymini
+          path: zymini
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout zyadmin (Backend)
+        uses: actions/checkout@v4
+        with:
+          repository: onerootgod/zyadmin
+          path: zyadmin
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        run: |
+          cd minitest
+          npm install
+          npx playwright install --with-deps
+
+      - name: Run Integrated UI Audit
+        run: |
+          cd minitest
+          # 通过环境变量告诉测试脚本源码在哪里
+          ZYMINI_PATH=$GITHUB_WORKSPACE/zymini npx playwright test tests/admin-check.spec.ts
+
+      - name: Report Result to War Room
+        if: always()
+        run: |
+          RESULT="${{ job.status == 'success' && '✅ 通过' || '❌ 失败' }}"
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d text="⚙️ <b>【GHA 全域巡检报】</b>%0A联动仓库: zymini, zyadmin, minitest%0A巡检结论: $RESULT%0A查看详情: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            -d parse_mode="HTML"
