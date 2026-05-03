@@ -1,0 +1,42 @@
+name: 🛡️ Admin Audit (Backend Management)
+on:
+  repository_dispatch:
+    types: [trigger-admin-audit]
+  workflow_dispatch:
+  push:
+    paths:
+      - 'tests/admin-check.spec.ts'
+      - '.github/workflows/admin-audit.yml'
+
+jobs:
+  admin-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: minitest
+          token: ${{ secrets.GH_PAT }}
+      
+      - uses: actions/checkout@v4
+        with:
+          repository: onerootgod/zyadmin
+          path: zyadmin
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Install & Run Playwright
+        run: |
+          cd minitest
+          npm install
+          npx playwright install --with-deps
+          npx playwright test tests/admin-check.spec.ts
+        env:
+          TEST_URL: 'https://zyadmin.pages.dev'
+
+      - name: 🛡️ Poppy: War Room Report
+        if: always()
+        run: |
+          TOKEN="${{ secrets.TELEGRAM_TOKEN }}"
+          CHAT_ID="-1003936889860"
+          STATUS="${{ job.status }}"
+          MSG="**波比｜🛡️ 后台审计报告**%0A---%0A状态：$STATUS%0A🔍 重点：Admin 适配与交互校验%0A📍 源码：[minitest](https://github.com/onerootgod/minitest)"
+          curl -s -X POST "https://api.telegram.org/bot$TOKEN/sendMessage" -d chat_id="$CHAT_ID" -d text="$MSG" -d parse_mode="Markdown"

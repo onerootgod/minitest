@@ -1,0 +1,54 @@
+name: ⚙️ Mini-App Audit (Frontend Core)
+on:
+  repository_dispatch:
+    types: [trigger-mini-audit]
+  workflow_dispatch:
+  push:
+    paths:
+      - 'tests/mini-app.test.js'
+      - '.github/workflows/mini-audit.yml'
+
+jobs:
+  mini-audit:
+    runs-on: macos-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: minitest
+          token: ${{ secrets.GH_PAT }}
+      
+      - uses: actions/checkout@v4
+        with:
+          repository: onerootgod/zymini
+          path: zymini
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Setup Node & Install IDE
+        run: |
+          # 黑默丁格：执行 macOS 稳定挂载
+          curl -sL -o wechat_devtools.dmg https://dldir1.qq.com/WechatWebDev/release/p-ae42eeed9c4d4dd9bc3d060b95cc95c4/wechat_devtools_1.06.2401020_x64.dmg
+          sudo hdiutil attach wechat_devtools.dmg -nobrowse -quiet
+          sudo cp -R "/Volumes/微信开发者工具/微信开发者工具.app" /Applications/
+          sudo hdiutil detach "/Volumes/微信开发者工具"
+          sudo ln -s "/Applications/微信开发者工具.app/Contents/MacOS/cli" /usr/local/bin/wechat-cli
+
+      - name: Run Mini-App Automator
+        run: |
+          cd minitest
+          npm install
+          # 开启 IDE 服务端口并运行脚本
+          wechat-cli open --project ../zymini || true
+          wechat-cli auto --project ../zymini --auto-port 9420 || true
+          npm run test:mini
+        env:
+          WECHAT_APPID: ${{ secrets.WECHAT_MINIPROGRAM_APPID }}
+
+      - name: ⚙️ Heimerdinger: War Room Report
+        if: always()
+        run: |
+          TOKEN="${{ secrets.TELEGRAM_TOKEN }}"
+          CHAT_ID="-1003936889860"
+          STATUS="${{ job.status }}"
+          MSG="**黑默丁格｜⚙️ 小程序内核战报**%0A---%0A状态：$STATUS%0A🚀 真实 IDE 环境审计完毕%0A📍 详见 GitHub Actions 日志"
+          curl -s -X POST "https://api.telegram.org/bot$TOKEN/sendMessage" -d chat_id="$CHAT_ID" -d text="$MSG" -d parse_mode="Markdown"
