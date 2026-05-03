@@ -9,6 +9,7 @@ on:
 jobs:
   integrated-audit:
     runs-on: ubuntu-latest
+    timeout-minutes: 45 # 提升超时时长以支持深度审计
     permissions:
       contents: write
     steps:
@@ -41,25 +42,28 @@ jobs:
         run: npm install -g miniprogram-ci
 
       - name: Mini-App Upload & Preview
+        id: mini_ci
         run: |
           cd zymini
           echo "${{ secrets.WECHAT_MINIPROGRAM_KEY }}" > private.key
+          mkdir -p ../minitest/audit-results/mini
           miniprogram-ci upload \
             --appid ${{ secrets.WECHAT_MINIPROGRAM_APPID }} \
             --key-path private.key \
             --version 1.0.0-audit \
-            --desc "GHA Automated Audit Preview" \
+            --desc "GHA Automated Deep Audit" \
             --project-path . \
             --qrcode-format image \
             --qrcode-output-path ../minitest/audit-results/mini/preview_qrcode.jpg
         continue-on-error: true
 
-      - name: Admin & Mini-Web Audit (Playwright)
+      - name: Deep Interaction Audit (Playwright)
         run: |
           cd minitest
           npm install
           npx playwright install --with-deps
-          npx playwright test tests/admin-check.spec.ts
+          # 运行深度审计脚本
+          npx playwright test tests/deep-audit.spec.ts
         env:
           TEST_URL: 'https://zyadmin.pages.dev'
 
@@ -70,20 +74,33 @@ jobs:
           git config --global user.name "Heimerdinger (Nexus Bot)"
           git config --global user.email "heimerdinger@nexus.one"
           git add audit-results/
-          git commit -m "📸 AUDIT: 自动生成多端适配审计快照 & 预览码 [$(date +'%Y-%m-%d %H:%M')]" || echo "No changes to commit"
+          git commit -m "📸 DEEP AUDIT: 全场景交互截图 & 预览码提交 [$(date +'%Y-%m-%d %H:%M')]" || echo "No changes to commit"
           git push origin main
 
       - name: Notify War Room
         if: always()
         run: |
-          STATUS="${{ job.status }}"
-          if [ "$STATUS" == "success" ]; then
-            EMOJI="✅"
+          TOKEN="${{ secrets.TELEGRAM_TOKEN }}"
+          CHAT_ID="${{ secrets.TELEGRAM_CHAT_ID }}"
+          QR_PATH="minitest/audit-results/mini/preview_qrcode.jpg"
+          
+          if [ "${{ job.status }}" == "success" ]; then
+            EMOJI="💎"
+            STATUS_TXT="深度审计完成 (Deep Audit Success)"
           else
-            EMOJI="❌"
+            EMOJI="⚠️"
+            STATUS_TXT="审计过程存在异常 (Audit Partial Failure)"
           fi
-          # 构建消息
-          MSG="$EMOJI 审计流水线运行结束：$STATUS。请查收最新的 ISSUE_LOG 和截图。"
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
-            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d text="$MSG"
+          
+          MSG="$EMOJI $STATUS_TXT。本次审计耗时较长，已捕捉 滑动/旋转/交互 等全量快照。"
+          
+          if [ -f "$QR_PATH" ]; then
+            curl -s -X POST "https://api.telegram.org/bot$TOKEN/sendPhoto" \
+              -F chat_id="$CHAT_ID" \
+              -F photo="@$QR_PATH" \
+              -F caption="$MSG"
+          else
+            curl -s -X POST "https://api.telegram.org/bot$TOKEN/sendMessage" \
+              -d chat_id="$CHAT_ID" \
+              -d text="$MSG"
+          fi
