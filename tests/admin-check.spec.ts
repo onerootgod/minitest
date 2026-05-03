@@ -1,6 +1,6 @@
 import { test, expect, devices } from '@playwright/test';
 
-const TARGET_URL = 'https://zyadmin.pages.dev'; // 替换为你的实际部署地址
+const TARGET_URL = 'http://localhost:8788'; // 替换为你的实际部署地址
 
 const testDevices = [
   { name: 'iPhone 15 Pro', ...devices['iPhone 15'] },
@@ -20,8 +20,8 @@ test.describe('Admin Panel Responsive Check', () => {
       await page.screenshot({ path: `./screenshots/${device.name.replace(/ /g, '_')}_login.png` });
       
       // 这里可以模拟登录后进入后台
-      // await page.fill('#access-code', 'one9root6man3');
-      // await page.click('button:has-text("校准接入")');
+      await page.fill('#access-code', 'one9root6man3');
+      await page.click('button:has-text("校准接入")');
       // await page.screenshot({ path: `./screenshots/${device.name.replace(/ /g, '_')}_dashboard.png` });
     });
   }
