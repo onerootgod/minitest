@@ -2,13 +2,12 @@
   "name": "minitest",
   "version": "1.0.0",
   "scripts": {
-    "test:admin": "npx playwright test",
+    "test:admin": "npx playwright test tests/admin-check.spec.ts",
     "test:mini": "jest tests/mini-app.test.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.42.0",
     "miniprogram-automator": "^0.12.1",
-    "miniprogram-ci": "^2.1.31",
     "jest": "^29.0.0"
   }
 }
