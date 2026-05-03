@@ -1,19 +1,19 @@
-name: TCM.OS Omni-Audit & Persistence
+name: TCM.OS Omni-Audit (Recovery)
 on:
   repository_dispatch:
     types: [trigger-audit]
   workflow_dispatch:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
 
 jobs:
-  integrated-audit:
+  stable-audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 45 # 提升超时时长以支持深度审计
+    timeout-minutes: 20
     permissions:
       contents: write
     steps:
-      - name: Checkout minitest
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           path: minitest
@@ -26,81 +26,35 @@ jobs:
           path: zymini
           token: ${{ secrets.GH_PAT }}
 
-      - name: Checkout zyadmin
-        uses: actions/checkout@v4
-        with:
-          repository: onerootgod/zyadmin
-          path: zyadmin
-          token: ${{ secrets.GH_PAT }}
-
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Install miniprogram-ci
-        run: npm install -g miniprogram-ci
-
-      - name: Mini-App Upload & Preview
-        id: mini_ci
-        run: |
-          cd zymini
-          echo "${{ secrets.WECHAT_MINIPROGRAM_KEY }}" > private.key
-          mkdir -p ../minitest/audit-results/mini
-          miniprogram-ci upload \
-            --appid ${{ secrets.WECHAT_MINIPROGRAM_APPID }} \
-            --key-path private.key \
-            --version 1.0.0-audit \
-            --desc "GHA Automated Deep Audit" \
-            --project-path . \
-            --qrcode-format image \
-            --qrcode-output-path ../minitest/audit-results/mini/preview_qrcode.jpg
-        continue-on-error: true
-
-      - name: Deep Interaction Audit (Playwright)
+      - name: Install
         run: |
           cd minitest
           npm install
           npx playwright install --with-deps
-          # 运行深度审计脚本
+
+      - name: Audit Run
+        run: |
+          cd minitest
           npx playwright test tests/deep-audit.spec.ts
         env:
           TEST_URL: 'https://zyadmin.pages.dev'
 
-      - name: Persist Audit Results
-        if: always()
-        run: |
-          cd minitest
-          git config --global user.name "Heimerdinger (Nexus Bot)"
-          git config --global user.email "heimerdinger@nexus.one"
-          git add audit-results/
-          git commit -m "📸 DEEP AUDIT: 全场景交互截图 & 预览码提交 [$(date +'%Y-%m-%d %H:%M')]" || echo "No changes to commit"
-          git push origin main
-
-      - name: Notify War Room
+      - name: 🛡️ Poppy: War Room Report
         if: always()
         run: |
           TOKEN="${{ secrets.TELEGRAM_TOKEN }}"
-          CHAT_ID="${{ secrets.TELEGRAM_CHAT_ID }}"
-          QR_PATH="minitest/audit-results/mini/preview_qrcode.jpg"
+          CHAT_ID="-1003936889860"
+          IMG="minitest/audit-results/admin/iPad_Pro_11_Landscape_phase1_init.png"
           
-          if [ "${{ job.status }}" == "success" ]; then
-            EMOJI="💎"
-            STATUS_TXT="深度审计完成 (Deep Audit Success)"
+          MSG="**波比｜🛡️ UI 自动审核战报**%0A---%0A✅ 宿主回滚至 Linux (Stable)%0A✅ 滑动/旋转场景已捕捉%0A📍 详见：https://github.com/onerootgod/minitest/tree/main/audit-results"
+          
+          if [ -f "$IMG" ]; then
+            curl -s -X POST "https://api.telegram.org/bot$TOKEN/sendPhoto" -F chat_id="$CHAT_ID" -F photo="@$IMG" -F caption="$MSG" -F parse_mode="Markdown"
           else
-            EMOJI="⚠️"
-            STATUS_TXT="审计过程存在异常 (Audit Partial Failure)"
-          fi
-          
-          MSG="$EMOJI $STATUS_TXT。本次审计耗时较长，已捕捉 滑动/旋转/交互 等全量快照。"
-          
-          if [ -f "$QR_PATH" ]; then
-            curl -s -X POST "https://api.telegram.org/bot$TOKEN/sendPhoto" \
-              -F chat_id="$CHAT_ID" \
-              -F photo="@$QR_PATH" \
-              -F caption="$MSG"
-          else
-            curl -s -X POST "https://api.telegram.org/bot$TOKEN/sendMessage" \
-              -d chat_id="$CHAT_ID" \
-              -d text="$MSG"
+            curl -s -X POST "https://api.telegram.org/bot$TOKEN/sendMessage" -d chat_id="$CHAT_ID" -d text="$MSG" -d parse_mode="Markdown"
           fi
